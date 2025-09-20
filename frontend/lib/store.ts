@@ -112,7 +112,18 @@ export const useChatStore = create<ChatState>((set) => ({
   setContext: (context) => set({ context }),
   clearChat: () => set({ messages: [], currentSessionId: null, context: {} }),
   clearChatHistory: () => set({ messages: [], currentSessionId: null }),
+  clearChatHistory: () => set({ messages: [], currentSessionId: null }),
 }));
+
+// Clear chat state when user logs out
+useAuthStore.subscribe((state) => {
+  if (!state.isAuthenticated) {
+    // Clear other stores when user logs out
+    useChatStore.getState().clearChat();
+    useNotificationStore.getState().setNotifications([]);
+    useNotificationStore.getState().setUnreadCount(0);
+  }
+});
 
 export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],

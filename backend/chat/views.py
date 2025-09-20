@@ -160,11 +160,16 @@ class ChatHistoryView(generics.ListAPIView):
     
     def get_queryset(self):
         if self.request.user.is_authenticated:
-            return ChatSession.objects.filter(user=self.request.user).prefetch_related('messages')
+            return ChatSession.objects.filter(
+                user=self.request.user
+            ).prefetch_related('messages')
         else:
             session_id = self.request.session.session_key
             if session_id:
-                return ChatSession.objects.filter(session_id=session_id).prefetch_related('messages')
+                return ChatSession.objects.filter(
+                    session_id=session_id,
+                    user__isnull=True
+                ).prefetch_related('messages')
         return ChatSession.objects.none()
 
 

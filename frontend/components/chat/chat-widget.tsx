@@ -400,6 +400,18 @@ export function ChatWidget() {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  <div className="pt-2 border-t">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleClearChat}
+                      disabled={isClearingChat || messages.length <= 1}
+                      className="w-full h-7 text-xs"
+                    >
+                      {isClearingChat ? 'Clearing...' : 'Clear Chat History'}
+                    </Button>
+                  </div>
                 </div>
               )}
 
