@@ -4,7 +4,6 @@ from . import views
 app_name = 'core'
 
 urlpatterns = [
-    path('config', views.SiteConfigView.as_view(), name='config'),
     path('achievements/', views.AchievementListView.as_view(), name='achievements'),
     path('testimonials/', views.TestimonialListView.as_view(), name='testimonials'),
     path('testimonials/submit', views.TestimonialCreateView.as_view(), name='testimonial_submit'),
