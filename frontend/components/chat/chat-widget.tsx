@@ -48,6 +48,7 @@ export function ChatWidget() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [pendingResponses, setPendingResponses] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const {
@@ -111,6 +112,71 @@ export function ChatWidget() {
     }
   }, [isOpen, isAuthenticated, messages.length, user, addMessage, setSessionId, setMessages]);
 
+  // Poll for pending AI responses
+  useEffect(() => {
+    if (pendingResponses.size === 0) return;
+
+    const pollInterval = setInterval(async () => {
+      const responsesToCheck = Array.from(pendingResponses);
+      
+      for (const messageId of responsesToCheck) {
+        try {
+          const response = await chatAPI.getResponseStatus(messageId);
+          const data = response.data;
+          
+          if (data.status === 'completed') {
+            // Add AI response message
+            const aiMessage: ChatMessage = {
+              id: data.message_id,
+              content: data.response,
+              is_from_user: false,
+              sources: data.sources,
+              created_at: data.timestamp,
+            };
+            
+            addMessage(aiMessage);
+            
+            // Remove from pending
+            setPendingResponses(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(messageId);
+              return newSet;
+            });
+            
+          } else if (data.status === 'error') {
+            // Add error message
+            const errorMessage: ChatMessage = {
+              id: data.message_id || Date.now().toString(),
+              content: data.message,
+              is_from_user: false,
+              created_at: data.timestamp,
+            };
+            
+            addMessage(errorMessage);
+            
+            // Remove from pending
+            setPendingResponses(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(messageId);
+              return newSet;
+            });
+          }
+          // If status is still 'processing', continue polling
+          
+        } catch (error) {
+          console.error('Failed to check response status:', error);
+          // Remove from pending on error to prevent infinite polling
+          setPendingResponses(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(messageId);
+            return newSet;
+          });
+        }
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [pendingResponses, addMessage]);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -139,18 +205,13 @@ export function ChatWidget() {
         tone,
       });
 
-      const aiMessage: ChatMessage = {
-        id: response.data.message_id,
-        content: response.data.response,
-        is_from_user: false,
-        sources: response.data.sources,
-        created_at: new Date().toISOString(),
-      };
-
-      addMessage(aiMessage);
-      
       if (response.data.session_id && !currentSessionId) {
         setSessionId(response.data.session_id);
+      }
+
+      // Add user message ID to pending responses for polling
+      if (response.data.user_message_id) {
+        setPendingResponses(prev => new Set(prev).add(response.data.user_message_id));
       }
 
       // Show save prompt for anonymous users after 3+ messages
@@ -457,12 +518,15 @@ export function ChatWidget() {
                     )}
 
                     {messages.map(renderMessage)}
-                    {isLoading && (
+                    {(isLoading || pendingResponses.size > 0) && (
                       <div className="flex gap-3">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
                           <Bot className="w-4 h-4 text-white" />
                         </div>
                         <div className="bg-muted rounded-lg p-3">
+                          <div className="text-xs text-muted-foreground mb-2">
+                            {isLoading ? 'Sending...' : 'Thinking...'}
+                          </div>
                           <div className="flex space-x-1">
                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />

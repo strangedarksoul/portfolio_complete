@@ -5,6 +5,7 @@ app_name = 'chat'
 
 urlpatterns = [
     path('query', views.ChatQueryView.as_view(), name='chat_query'),
+    path('response/<uuid:message_id>', views.ChatResponseStatusView.as_view(), name='chat_response_status'),
     path('history', views.ChatHistoryView.as_view(), name='chat_history'),
     path('session/<uuid:session_id>', views.ChatSessionView.as_view(), name='chat_session'),
     path('feedback/message', views.MessageFeedbackView.as_view(), name='message_feedback'),

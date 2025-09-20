@@ -13,6 +13,7 @@ urlpatterns = [
     # Hire request endpoints
     path('hire/request', views.HireRequestCreateView.as_view(), name='hire_request'),
     path('hire/<int:pk>', views.HireRequestDetailView.as_view(), name='hire_detail'),
+    path('hire/user-requests', views.UserHireRequestsView.as_view(), name='user_hire_requests'),
     
     # Admin endpoints
     path('admin/gigs', views.AdminGigListView.as_view(), name='admin_gig_list'),
