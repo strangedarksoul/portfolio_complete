@@ -228,6 +228,55 @@ export function ChatWidget() {
     }
   };
 
+  const handleClearChat = async () => {
+    if (!currentSessionId || messages.length <= 1) return;
+
+    const confirmed = window.confirm(
+      'Are you sure you want to clear your chat history? This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    setIsClearingChat(true);
+
+    try {
+      // Call backend to clear the session
+      await chatAPI.clearSession(currentSessionId);
+      
+      // Clear local state
+      clearChatHistory();
+      
+      // Add welcome message back
+      const welcomeMessage: ChatMessage = {
+        id: 'welcome',
+        content: "Hi! I'm Edzio's AI assistant. I know everything about his work, skills, and projects. Ask me anything - I can tailor my responses for recruiters, developers, founders, or general visitors. What would you like to know?",
+        is_from_user: false,
+        created_at: new Date().toISOString(),
+      };
+      addMessage(welcomeMessage);
+      
+      // Track analytics
+      analytics.track('chat_session_cleared', {
+        session_id: currentSessionId,
+        message_count: messages.length,
+      });
+      
+    } catch (error) {
+      console.error('Failed to clear chat session:', error);
+      // Still clear local state even if backend call fails
+      clearChatHistory();
+      
+      const welcomeMessage: ChatMessage = {
+        id: 'welcome',
+        content: "Hi! I'm Edzio's AI assistant. I know everything about his work, skills, and projects. Ask me anything - I can tailor my responses for recruiters, developers, founders, or general visitors. What would you like to know?",
+        is_from_user: false,
+        created_at: new Date().toISOString(),
+      };
+      addMessage(welcomeMessage);
+    } finally {
+      setIsClearingChat(false);
+    }
+  };
   const renderMessage = (message: ChatMessage) => (
     <div key={message.id} className={`flex gap-3 ${message.is_from_user ? 'justify-end' : 'justify-start'}`}>
       {!message.is_from_user && (
