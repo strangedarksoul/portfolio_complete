@@ -48,6 +48,7 @@ export function ChatWidget() {
   const [isMinimized, setIsMinimized] = useState(false);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
+  const [isClearingChat, setIsClearingChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const {
@@ -65,6 +66,7 @@ export function ChatWidget() {
     setAudience,
     setDepth,
     setTone,
+    clearChatHistory,
   } = useChatStore();
   
   const { user, isAuthenticated } = useAuthStore();
@@ -89,13 +91,22 @@ export function ChatWidget() {
         const response = await chatAPI.getHistory(user?.id);
         if (response.data.results?.length > 0) {
           const latestSession = response.data.results[0];
-          setSessionId(latestSession.id);
-          setMessages(latestSession.messages || []);
+          // Only load if this session belongs to the current user
+          if (user && latestSession.user === user.id) {
+            setSessionId(latestSession.id);
+            setMessages(latestSession.messages || []);
+          } else {
+            // Clear any existing chat data and add welcome message
+            clearChatHistory();
+            addWelcomeMessage();
+          }
         } else {
+          clearChatHistory();
           addWelcomeMessage();
         }
       } catch (error) {
         console.error('Failed to load chat history:', error);
+        clearChatHistory();
         addWelcomeMessage();
       }
     };

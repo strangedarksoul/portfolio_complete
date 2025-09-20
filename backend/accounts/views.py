@@ -126,6 +126,9 @@ class UserLogoutView(APIView):
                 token = RefreshToken(refresh_token)
                 token.blacklist()
             
+            # Flush the session to prevent chat history leakage
+            request.session.flush()
+            
             # Track logout
             AnalyticsEvent.objects.create(
                 event_type='user_logout',

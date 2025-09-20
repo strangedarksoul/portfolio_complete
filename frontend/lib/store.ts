@@ -51,6 +51,7 @@ interface ChatState {
   setTone: (tone: ChatState['tone']) => void;
   setContext: (context: any) => void;
   clearChat: () => void;
+  clearChatHistory: () => void;
 }
 
 interface NotificationState {
@@ -110,6 +111,7 @@ export const useChatStore = create<ChatState>((set) => ({
   setTone: (tone) => set({ tone }),
   setContext: (context) => set({ context }),
   clearChat: () => set({ messages: [], currentSessionId: null, context: {} }),
+  clearChatHistory: () => set({ messages: [], currentSessionId: null }),
 }));
 
 export const useNotificationStore = create<NotificationState>((set) => ({

@@ -36,14 +36,27 @@ class ChatQueryView(APIView):
         depth = data.get('depth', 'medium')
         tone = data.get('tone', 'professional')
         
-        # Get or create session
-        if session_id:
+        # Get or create session - prioritize authenticated user
+        session = None
+        
+        if request.user.is_authenticated:
+            # For authenticated users, find their existing session or create a new one
+            # Ignore session_id from frontend to prevent cross-user contamination
             try:
-                session = ChatSession.objects.get(id=session_id)
-            except ChatSession.DoesNotExist:
+                session = ChatSession.objects.filter(user=request.user, is_active=True).first()
+                if not session:
+                    session = self.create_session(request, audience, tone)
+            except Exception:
                 session = self.create_session(request, audience, tone)
         else:
-            session = self.create_session(request, audience, tone)
+            # For anonymous users, use session_id logic
+            if session_id:
+                try:
+                    session = ChatSession.objects.get(id=session_id, user__isnull=True)
+                except ChatSession.DoesNotExist:
+                    session = self.create_session(request, audience, tone)
+            else:
+                session = self.create_session(request, audience, tone)
         
         # Create user message
         user_message = ChatMessage.objects.create(
@@ -135,7 +148,7 @@ class ChatQueryView(APIView):
         """Create new chat session"""
         return ChatSession.objects.create(
             user=request.user if request.user.is_authenticated else None,
-            session_id=request.session.session_key or str(uuid.uuid4()),
+            session_id=request.session.session_key if request.session.session_key else str(uuid.uuid4()),
             audience_tag=audience,
             persona_tone=tone
         )
@@ -209,6 +222,50 @@ class MessageFeedbackView(APIView):
                 return Response({'error': 'Message not found'}, status=status.HTTP_404_NOT_FOUND)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ClearChatSessionView(APIView):
+    """Clear chat session messages"""
+    permission_classes = [AllowAny]
+    
+    def post(self, request, session_id):
+        try:
+            # Find the session
+            if request.user.is_authenticated:
+                session = ChatSession.objects.get(id=session_id, user=request.user)
+            else:
+                session = ChatSession.objects.get(
+                    id=session_id, 
+                    session_id=request.session.session_key,
+                    user__isnull=True
+                )
+            
+            # Clear all messages in the session
+            session.messages.all().delete()
+            
+            # Reset session counters
+            session.message_count = 0
+            session.total_tokens_used = 0
+            session.average_rating = None
+            session.save()
+            
+            # Track analytics
+            AnalyticsEvent.objects.create(
+                event_type='chat_session_cleared',
+                user=request.user if request.user.is_authenticated else None,
+                session_id=request.session.session_key,
+                metadata={
+                    'chat_session_id': str(session_id),
+                    'cleared_at': timezone.now().isoformat()
+                }
+            )
+            
+            return Response({'status': 'success', 'message': 'Chat history cleared'})
+            
+        except ChatSession.DoesNotExist:
+            return Response({'error': 'Chat session not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': 'Failed to clear chat session'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class SessionFeedbackView(APIView):

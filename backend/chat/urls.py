@@ -7,6 +7,7 @@ urlpatterns = [
     path('query', views.ChatQueryView.as_view(), name='chat_query'),
     path('history', views.ChatHistoryView.as_view(), name='chat_history'),
     path('session/<uuid:session_id>', views.ChatSessionView.as_view(), name='chat_session'),
+    path('session/<uuid:session_id>/clear', views.ClearChatSessionView.as_view(), name='clear_chat_session'),
     path('feedback/message', views.MessageFeedbackView.as_view(), name='message_feedback'),
     path('feedback/session', views.SessionFeedbackView.as_view(), name='session_feedback'),
 ]

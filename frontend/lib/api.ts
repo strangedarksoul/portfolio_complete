@@ -95,6 +95,7 @@ export const chatAPI = {
   sendQuery: (data: any) => api.post('/api/v1/chat/query', data),
   getHistory: (userId?: string) => api.get(`/api/v1/chat/history${userId ? `?userId=${userId}` : ''}`),
   getSession: (sessionId: string) => api.get(`/api/v1/chat/session/${sessionId}`),
+  clearSession: (sessionId: string) => api.post(`/api/v1/chat/session/${sessionId}/clear`),
   sendMessageFeedback: (data: any) => api.post('/api/v1/chat/feedback/message', data),
   sendSessionFeedback: (data: any) => api.post('/api/v1/chat/feedback/session', data),
 };
