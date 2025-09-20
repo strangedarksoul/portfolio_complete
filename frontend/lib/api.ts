@@ -93,7 +93,6 @@ export const projectsAPI = {
 
 export const chatAPI = {
   sendQuery: (data: any) => api.post('/api/v1/chat/query', data),
-  getResponseStatus: (messageId: string) => api.get(`/api/v1/chat/response/${messageId}`),
   getHistory: (userId?: string) => api.get(`/api/v1/chat/history${userId ? `?userId=${userId}` : ''}`),
   getSession: (sessionId: string) => api.get(`/api/v1/chat/session/${sessionId}`),
   sendMessageFeedback: (data: any) => api.post('/api/v1/chat/feedback/message', data),

@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
-from analytics.tasks import track_event
+from analytics.models import AnalyticsEvent
 
 from .models import Skill, Project, CaseStudy
 from .serializers import (
@@ -50,15 +50,15 @@ class ProjectDetailView(generics.RetrieveAPIView):
         instance = self.get_object()
         
         # Track project view
-        track_event.delay(
-            'project_view',
+        AnalyticsEvent.objects.create(
+            event_type='project_view',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
             metadata={
                 'project_id': instance.id,
                 'project_title': instance.title,
                 'project_slug': instance.slug,
-            },
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+            }
         )
         
         # Increment view count
@@ -88,15 +88,15 @@ class CaseStudyDetailView(generics.RetrieveAPIView):
         instance = self.get_object()
         
         # Track case study view
-        track_event.delay(
-            'casestudy_view',
+        AnalyticsEvent.objects.create(
+            event_type='casestudy_view',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
             metadata={
                 'casestudy_id': instance.id,
                 'project_id': instance.project.id,
                 'project_title': instance.project.title,
-            },
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+            }
         )
         
         serializer = self.get_serializer(instance)
@@ -114,15 +114,15 @@ class SkillProjectsView(APIView):
         ).prefetch_related('skills')
         
         # Track skill exploration
-        track_event.delay(
-            'skill_explore',
+        AnalyticsEvent.objects.create(
+            event_type='skill_explore',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
             metadata={
                 'skill_id': skill.id,
                 'skill_name': skill.name,
                 'skill_slug': skill.slug,
-            },
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+            }
         )
         
         serializer = SkillProjectsSerializer(skill)

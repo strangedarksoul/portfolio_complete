@@ -16,7 +16,7 @@ from .serializers import SiteConfigurationSerializer, AchievementSerializer, Tes
 from .serializers import FileUploadSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
-from analytics.tasks import track_event
+from analytics.models import AnalyticsEvent
 
 User = get_user_model()
 
@@ -29,14 +29,14 @@ class PortalGreetingView(APIView):
         user_id = request.query_params.get('userId')
         
         # Track portal visit
-        track_event.delay(
-            'portal_visit',
+        AnalyticsEvent.objects.create(
+            event_type='portal_visit',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
             metadata={
                 'timestamp': timezone.now().isoformat(),
                 'user_agent': request.META.get('HTTP_USER_AGENT', ''),
-            },
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+            }
         )
         
         greeting_data = {
@@ -76,14 +76,14 @@ class RememberUserView(APIView):
             request.session['display_name_preference'] = name
         
         # Track consent event
-        track_event.delay(
-            'consent_given',
+        AnalyticsEvent.objects.create(
+            event_type='consent_given',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
             metadata={
                 'consent_type': 'localStorage',
                 'name_provided': bool(name),
-            },
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+            }
         )
         
         return Response({'status': 'success', 'message': 'Preference saved'})
@@ -130,15 +130,15 @@ class TestimonialCreateView(generics.CreateAPIView):
             testimonial = serializer.save()
             
             # Track testimonial submission
-            track_event.delay(
-                'testimonial_submitted',
+            AnalyticsEvent.objects.create(
+                event_type='testimonial_submitted',
+                user=request.user if request.user.is_authenticated else None,
+                session_id=request.session.session_key,
                 metadata={
                     'testimonial_id': testimonial.id,
                     'rating': testimonial.rating,
                     'has_project': testimonial.project is not None,
-                },
-                user_id=request.user.id if request.user.is_authenticated else None,
-                session_key=request.session.session_key
+                }
             )
             
             return Response({
@@ -282,11 +282,11 @@ class ResumeDownloadView(APIView):
         format_type = request.query_params.get('format', 'one-page')
         
         # Track download
-        track_event.delay(
-            'resume_download',
-            metadata={'format': format_type},
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+        AnalyticsEvent.objects.create(
+            event_type='resume_download',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
+            metadata={'format': format_type}
         )
         
         # For now, return a placeholder response
@@ -365,17 +365,17 @@ class FileUploadView(APIView):
             file_url = default_storage.url(saved_path)
             
             # Track upload
-            track_event.delay(
-                'file_upload',
+            AnalyticsEvent.objects.create(
+                event_type='file_upload',
+                user=request.user if request.user.is_authenticated else None,
+                session_id=request.session.session_key,
                 metadata={
                     'filename': uploaded_file.name,
                     'file_size': uploaded_file.size,
                     'file_type': file_type,
                     'upload_type': upload_type,
                     'saved_path': saved_path,
-                },
-                user_id=request.user.id if request.user.is_authenticated else None,
-                session_key=request.session.session_key
+                }
             )
             
             return Response({

@@ -77,7 +77,6 @@ export function SmartHireForm({ preselectedGig }: SmartHireFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submissionId, setSubmissionId] = useState<string>('');
-  const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: number; url: string }>>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -151,13 +150,8 @@ export function SmartHireForm({ preselectedGig }: SmartHireFormProps) {
       
       const response = await gigsAPI.submitHireRequest(submissionData);
       setSubmissionId(response.data.id);
+      setProposalPreview(response.data.proposal_preview || '');
       setIsSubmitted(true);
-      
-      // Start polling for proposal preview
-      if (response.data.id) {
-        setIsGeneratingProposal(true);
-        pollForProposalPreview(response.data.id);
-      }
       
       analytics.track('hire_form_submit', {
         gig_id: data.selected_gig,
@@ -172,38 +166,6 @@ export function SmartHireForm({ preselectedGig }: SmartHireFormProps) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const pollForProposalPreview = async (hireRequestId: string) => {
-    const maxAttempts = 30; // Poll for up to 1 minute (30 * 2 seconds)
-    let attempts = 0;
-    
-    const poll = async () => {
-      try {
-        const response = await gigsAPI.getHireRequest(parseInt(hireRequestId));
-        const hireRequest = response.data;
-        
-        if (hireRequest.proposal_preview) {
-          setProposalPreview(hireRequest.proposal_preview);
-          setIsGeneratingProposal(false);
-          return;
-        }
-        
-        attempts++;
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 2000); // Poll every 2 seconds
-        } else {
-          setIsGeneratingProposal(false);
-          setProposalPreview('Proposal generation is taking longer than expected. You will receive it via email shortly.');
-        }
-      } catch (error) {
-        console.error('Failed to fetch proposal preview:', error);
-        setIsGeneratingProposal(false);
-        setProposalPreview('Proposal will be sent to your email shortly.');
-      }
-    };
-    
-    poll();
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -300,14 +262,7 @@ export function SmartHireForm({ preselectedGig }: SmartHireFormProps) {
                 <Sparkles className="w-5 h-5 text-purple-400" />
                 AI-Generated Proposal Preview
               </h3>
-              {isGeneratingProposal ? (
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
-                    <span className="text-sm">Generating personalized proposal...</span>
-                  </div>
-                </div>
-              ) : proposalPreview ? (
+              {proposalPreview ? (
                 <div className="bg-muted/50 p-4 rounded-lg">
                   <div className="prose prose-sm max-w-none">
                     {proposalPreview.split('\n').map((line, index) => (

@@ -2,7 +2,7 @@ import json
 import uuid
 from django.utils.deprecation import MiddlewareMixin
 from django.contrib.auth.models import AnonymousUser
-from analytics.tasks import track_event
+from analytics.models import AnalyticsEvent
 
 
 class AnalyticsMiddleware(MiddlewareMixin):
@@ -27,19 +27,16 @@ class AnalyticsMiddleware(MiddlewareMixin):
             
             user = request.user if request.user.is_authenticated else None
             
-            track_event.delay(
-                'api_request',
+            AnalyticsEvent.objects.create(
+                event_type='api_request',
+                user=user,
+                session_id=request.session.session_key,
                 metadata={
                     'path': request.path,
                     'method': request.method,
                     'user_agent': request.META.get('HTTP_USER_AGENT', ''),
                     'ip_address': self.get_client_ip(request),
-                },
-                user_id=user.id if user else None,
-                session_key=request.session.session_key,
-                ip_address=self.get_client_ip(request),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
-                referrer=request.META.get('HTTP_REFERER', '')
+                }
             )
         except Exception:
             # Silently fail - don't break the request

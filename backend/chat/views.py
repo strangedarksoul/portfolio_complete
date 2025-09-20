@@ -5,7 +5,6 @@ from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db.models import Q
-from django.core.cache import cache
 import openai
 import time
 import uuid
@@ -16,7 +15,7 @@ from .serializers import (
     ChatSessionSerializer, ChatMessageSerializer, ChatQuerySerializer,
     ChatFeedbackSerializer, MessageFeedbackSerializer
 )
-from .tasks import generate_ai_response
+from .services import ChatAIService
 from analytics.models import AnalyticsEvent
 
 
@@ -53,41 +52,84 @@ class ChatQueryView(APIView):
             is_from_user=True
         )
         
-        # Update session message count for user message
-        session.message_count += 1
-        session.save()
-        
-        # Start AI response generation task
-        task = generate_ai_response.delay(
-            session_id=str(session.id),
-            user_message_id=str(user_message.id),
-            query=query,
-            context=context,
-            audience=audience,
-            depth=depth,
-            tone=tone
-        )
-        
-        # Track analytics (async task would be better)
-        from analytics.tasks import track_event
-        track_event.delay('chat_query', {
-            'chat_session_id': str(session.id),
-            'query_length': len(query),
-            'audience': audience,
-            'tone': tone,
-            'depth': depth,
-            'user_id': request.user.id if request.user.is_authenticated else None,
-            'session_key': request.session.session_key,
-        })
-        
-        return Response({
-            'session_id': session.id,
-            'user_message_id': user_message.id,
-            'task_id': task.id,
-            'status': 'processing',
-            'message': 'Generating response...',
-            'message_count': session.message_count
-        })
+        # Generate AI response
+        start_time = time.time()
+        try:
+            ai_service = ChatAIService()
+            response_data = ai_service.generate_response(
+                query=query,
+                session=session,
+                context=context,
+                audience=audience,
+                depth=depth,
+                tone=tone
+            )
+            
+            response_time = int((time.time() - start_time) * 1000)
+            
+            # Create AI message
+            ai_message = ChatMessage.objects.create(
+                session=session,
+                content=response_data['response'],
+                is_from_user=False,
+                response_time_ms=response_time,
+                tokens_used=response_data.get('tokens_used', 0),
+                model_used=response_data.get('model_used', ''),
+                context_data=context,
+                sources=response_data.get('sources', [])
+            )
+            
+            # Update session
+            session.message_count += 2
+            session.total_tokens_used += response_data.get('tokens_used', 0)
+            session.save()
+            
+            # Track analytics
+            AnalyticsEvent.objects.create(
+                event_type='chat_query',
+                user=request.user if request.user.is_authenticated else None,
+                session_id=request.session.session_key,
+                metadata={
+                    'chat_session_id': str(session.id),
+                    'query_length': len(query),
+                    'response_time_ms': response_time,
+                    'audience': audience,
+                    'tone': tone,
+                    'depth': depth,
+                    'tokens_used': response_data.get('tokens_used', 0),
+                }
+            )
+            
+            return Response({
+                'session_id': session.id,
+                'message_id': ai_message.id,
+                'response': response_data['response'],
+                'sources': response_data.get('sources', []),
+                'response_time_ms': response_time,
+                'message_count': session.message_count
+            })
+            
+        except Exception as e:
+            # Handle AI service errors
+            error_message = "I apologize, but I'm having trouble processing your request right now. Please try again in a moment."
+            
+            ai_message = ChatMessage.objects.create(
+                session=session,
+                content=error_message,
+                is_from_user=False,
+                response_time_ms=int((time.time() - start_time) * 1000),
+            )
+            
+            session.message_count += 2
+            session.save()
+            
+            return Response({
+                'session_id': session.id,
+                'message_id': ai_message.id,
+                'response': error_message,
+                'sources': [],
+                'error': True
+            })
     
     def create_session(self, request, audience, tone):
         """Create new chat session"""
@@ -99,21 +141,6 @@ class ChatQueryView(APIView):
         )
 
 
-class ChatResponseStatusView(APIView):
-    """Check status of AI response generation"""
-    permission_classes = [AllowAny]
-    
-    def get(self, request, message_id):
-        cache_key = f"ai_response_{message_id}"
-        response_data = cache.get(cache_key)
-        
-        if not response_data:
-            return Response({
-                'status': 'not_found',
-                'message': 'Response not found or expired'
-            }, status=status.HTTP_404_NOT_FOUND)
-        
-        return Response(response_data)
 class ChatHistoryView(generics.ListAPIView):
     """Get chat history for user"""
     serializer_class = ChatSessionSerializer

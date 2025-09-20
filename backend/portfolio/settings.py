@@ -322,12 +322,6 @@ CACHES = {
         'LOCATION': config('REDIS_URL', default='redis://localhost:6379/1'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        },
-        'KEY_PREFIX': 'edzio_portfolio',
-        'TIMEOUT': 300,  # 5 minutes default
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'SERIALIZER': 'django_redis.serializers.json.JSONSerializer',
         }
     }
 }

@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from analytics.tasks import track_event
+from analytics.models import AnalyticsEvent
 
 from .models import GigCategory, Gig, HireRequest, GigClick
 from .serializers import (
@@ -45,15 +45,15 @@ class GigDetailView(generics.RetrieveAPIView):
         instance = self.get_object()
         
         # Track gig view
-        track_event.delay(
-            'gig_view',
+        AnalyticsEvent.objects.create(
+            event_type='gig_view',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
             metadata={
                 'gig_id': instance.id,
                 'gig_title': instance.title,
                 'gig_slug': instance.slug,
-            },
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+            }
         )
         
         # Track click in the gig model
@@ -92,16 +92,16 @@ class GigClickTrackingView(APIView):
         )
         
         # Track analytics event
-        track_event.delay(
-            'gig_click',
+        AnalyticsEvent.objects.create(
+            event_type='gig_click',
+            user=request.user if request.user.is_authenticated else None,
+            session_id=request.session.session_key,
             metadata={
                 'gig_id': gig.id,
                 'gig_title': gig.title,
                 'click_type': click_type,
                 'external_platform': external_platform,
-            },
-            user_id=request.user.id if request.user.is_authenticated else None,
-            session_key=request.session.session_key
+            }
         )
         
         # Update gig counters
@@ -130,16 +130,16 @@ class HireRequestCreateView(generics.CreateAPIView):
             send_hire_confirmation.delay(hire_request.id)
             
             # Track hire request
-            track_event.delay(
-                'hire_request',
+            AnalyticsEvent.objects.create(
+                event_type='hire_request',
+                user=request.user if request.user.is_authenticated else None,
+                session_id=request.session.session_key,
                 metadata={
                     'hire_request_id': hire_request.id,
                     'gig_id': hire_request.selected_gig.id if hire_request.selected_gig else None,
                     'budget_range': hire_request.proposed_budget,
                     'timeline': hire_request.timeline,
-                },
-                user_id=request.user.id if request.user.is_authenticated else None,
-                session_key=request.session.session_key
+                }
             )
             
             # Update gig hire count
@@ -168,13 +168,6 @@ class HireRequestDetailView(generics.RetrieveAPIView):
         return HireRequest.objects.none()
 
 
-class UserHireRequestsView(generics.ListAPIView):
-    """Get hire requests for authenticated user"""
-    serializer_class = HireRequestDetailSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        return HireRequest.objects.filter(user=self.request.user).select_related('selected_gig')
 # Admin Views
 class AdminGigListView(generics.ListAPIView):
     """Admin: List all gigs"""

@@ -15,8 +15,7 @@ from .serializers import (
     UserUpdateSerializer, EmailVerificationSerializer,
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 )
-from analytics.tasks import track_event
-from .tasks import send_verification_email, send_password_reset_email
+from analytics.models import AnalyticsEvent
 
 
 class UserRegistrationView(APIView):
@@ -34,17 +33,17 @@ class UserRegistrationView(APIView):
             user.save()
             
             # Send verification email
-            send_verification_email.delay(user.id, verification_token)
+            self.send_verification_email(user, verification_token)
             
             # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
             
             # Track registration
-            track_event.delay(
-                'user_registration',
-                metadata={'registration_date': timezone.now().isoformat()},
-                user_id=user.id,
-                session_key=request.session.session_key
+            AnalyticsEvent.objects.create(
+                event_type='user_registration',
+                user=user,
+                session_id=request.session.session_key,
+                metadata={'registration_date': timezone.now().isoformat()}
             )
             
             return Response({
@@ -58,6 +57,26 @@ class UserRegistrationView(APIView):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    def send_verification_email(self, user, token):
+        """Send email verification email"""
+        try:
+            verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+            send_mail(
+                subject='Verify your email - Edzio Portfolio',
+                message=f'Please verify your email by clicking: {verification_url}',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=f'''
+                <h2>Welcome to Edzio's Portfolio!</h2>
+                <p>Please verify your email address by clicking the link below:</p>
+                <a href="{verification_url}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify Email</a>
+                <p>If the button doesn't work, copy and paste this URL into your browser:</p>
+                <p>{verification_url}</p>
+                '''
+            )
+        except Exception as e:
+            # Log error but don't fail registration
+            print(f"Failed to send verification email: {e}")
 
 
 class UserLoginView(APIView):
@@ -78,11 +97,11 @@ class UserLoginView(APIView):
             refresh = RefreshToken.for_user(user)
             
             # Track login
-            track_event.delay(
-                'user_login',
-                metadata={'login_date': timezone.now().isoformat()},
-                user_id=user.id,
-                session_key=request.session.session_key
+            AnalyticsEvent.objects.create(
+                event_type='user_login',
+                user=user,
+                session_id=request.session.session_key,
+                metadata={'login_date': timezone.now().isoformat()}
             )
             
             return Response({
@@ -108,11 +127,11 @@ class UserLogoutView(APIView):
                 token.blacklist()
             
             # Track logout
-            track_event.delay(
-                'user_logout',
-                metadata={'logout_date': timezone.now().isoformat()},
-                user_id=request.user.id,
-                session_key=request.session.session_key
+            AnalyticsEvent.objects.create(
+                event_type='user_logout',
+                user=request.user,
+                session_id=request.session.session_key,
+                metadata={'logout_date': timezone.now().isoformat()}
             )
             
             return Response({'message': 'Successfully logged out'})
@@ -161,7 +180,7 @@ class PasswordResetRequestView(APIView):
                 )
                 
                 # Send reset email
-                send_password_reset_email.delay(user.id, reset_token.token)
+                self.send_reset_email(user, reset_token.token)
                 
             except User.DoesNotExist:
                 pass  # Don't reveal if email exists
@@ -171,6 +190,26 @@ class PasswordResetRequestView(APIView):
             })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def send_reset_email(self, user, token):
+        """Send password reset email"""
+        try:
+            reset_url = f"{settings.FRONTEND_URL}/password-reset?token={token}"
+            send_mail(
+                subject='Password Reset - Edzio Portfolio',
+                message=f'Reset your password by clicking: {reset_url}',
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                html_message=f'''
+                <h2>Password Reset Request</h2>
+                <p>Click the link below to reset your password:</p>
+                <a href="{reset_url}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+                <p>If you didn't request this, you can safely ignore this email.</p>
+                <p>This link will expire in 1 hour.</p>
+                '''
+            )
+        except Exception as e:
+            print(f"Failed to send reset email: {e}")
 
 
 class PasswordResetConfirmView(APIView):
@@ -260,14 +299,14 @@ class UserAvatarUpdateView(APIView):
             request.user.save(update_fields=['avatar'])
             
             # Track avatar update
-            track_event.delay(
-                'avatar_updated',
+            AnalyticsEvent.objects.create(
+                event_type='avatar_updated',
+                user=request.user,
+                session_id=request.session.session_key,
                 metadata={
                     'file_size': avatar_file.size,
                     'file_type': avatar_file.content_type,
-                },
-                user_id=request.user.id,
-                session_key=request.session.session_key
+                }
             )
             
             return Response(UserProfileSerializer(request.user, context={'request': request}).data)
