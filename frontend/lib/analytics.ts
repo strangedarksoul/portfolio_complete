@@ -30,21 +30,47 @@ class Analytics {
 
     this.isProcessing = true;
 
-    while (this.queue.length > 0) {
-      const event = this.queue.shift();
-      if (event) {
-        try {
-          await analyticsAPI.trackEvent(event);
-        } catch (error) {
-          console.warn('Failed to track analytics event:', error);
-          // Re-queue the event for retry
-          this.queue.unshift(event);
-          break;
+    // Process events in batches to avoid overwhelming the server
+    const batchSize = 5;
+    const batch = this.queue.splice(0, Math.min(batchSize, this.queue.length));
+    
+    for (const event of batch) {
+      try {
+        await analyticsAPI.trackEvent(event);
+      } catch (error) {
+        console.warn('Failed to track analytics event:', error);
+        // Re-queue failed events at the beginning for retry
+        this.queue.unshift(event);
+        break;
+      }
+    }
+    
+    this.isProcessing = false;
+    
+    // Continue processing if there are more events
+    if (this.queue.length > 0) {
+      setTimeout(() => this.processQueue(), 1000); // Wait 1 second before next batch
+    }
+  }
+
+  // Enhanced error handling and retry logic
+  async trackWithRetry(event_type: string, metadata?: Record<string, any>, maxRetries = 3) {
+    let attempts = 0;
+    
+    while (attempts < maxRetries) {
+      try {
+        await this.track(event_type, metadata);
+        return; // Success, exit retry loop
+      } catch (error) {
+        attempts++;
+        if (attempts >= maxRetries) {
+          console.error(`Failed to track event ${event_type} after ${maxRetries} attempts:`, error);
+        } else {
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
         }
       }
     }
-
-    this.isProcessing = false;
   }
 
   // Convenience methods for common events

@@ -525,13 +525,18 @@ export function ChatWidget() {
                         </div>
                         <div className="bg-muted rounded-lg p-3">
                           <div className="text-xs text-muted-foreground mb-2">
-                            {isLoading ? 'Sending...' : 'Thinking...'}
+                            {isLoading ? 'Sending...' : `Thinking... (${pendingResponses.size} pending)`}
                           </div>
                           <div className="flex space-x-1">
                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
                             <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                           </div>
+                          {pendingResponses.size > 0 && (
+                            <div className="text-xs text-muted-foreground mt-2">
+                              AI is processing your request...
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -547,18 +552,23 @@ export function ChatWidget() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Ask me anything about Edzio's work..."
                     onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                    disabled={isLoading}
+                    disabled={isLoading || pendingResponses.size >= 3} // Limit concurrent requests
                     className="flex-1"
                   />
                   <Button
                     onClick={sendMessage}
-                    disabled={!input.trim() || isLoading}
+                    disabled={!input.trim() || isLoading || pendingResponses.size >= 3}
                     size="sm"
                     className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                   >
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
+                {pendingResponses.size >= 3 && (
+                  <div className="text-xs text-muted-foreground text-center">
+                    Please wait for current responses before sending more messages
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

@@ -65,15 +65,19 @@ class TestimonialSerializer(serializers.ModelSerializer):
 
 class TestimonialCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating testimonials"""
+    author_email = serializers.EmailField(required=False, write_only=True)
     
     class Meta:
         model = Testimonial
         fields = [
-            'author_name', 'author_role', 'author_company',
+            'author_name', 'author_role', 'author_company', 'author_email',
             'content', 'rating', 'project'
         ]
     
     def create(self, validated_data):
+        # Remove author_email as it's not a model field (used for anonymous submissions)
+        validated_data.pop('author_email', None)
+        
         # Set user if authenticated
         request = self.context.get('request')
         if request and request.user.is_authenticated:

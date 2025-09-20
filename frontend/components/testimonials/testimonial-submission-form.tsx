@@ -94,22 +94,17 @@ export function TestimonialSubmissionForm() {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <Card className="max-w-md mx-auto">
-        <CardContent className="p-8 text-center">
-          <AlertCircle className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">Login Required</h3>
-          <p className="text-muted-foreground mb-4">
-            Please log in to submit a testimonial.
-          </p>
-          <Button onClick={() => window.location.href = '/auth/login'}>
-            Login to Continue
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'hire_request': return '💼';
+      case 'project_update': return '🚀';
+      case 'message': return '💬';
+      case 'announcement': return '📢';
+      case 'reminder': return '⏰';
+      case 'welcome': return '👋';
+      default: return '📝';
+    }
+  };
 
   if (isSubmitted) {
     return (
@@ -161,6 +156,7 @@ export function TestimonialSubmissionForm() {
                   id="author_name"
                   {...form.register('author_name')}
                   placeholder="Full name"
+                  defaultValue={user?.full_name || ''}
                 />
                 {form.formState.errors.author_name && (
                   <p className="text-red-500 text-sm">{form.formState.errors.author_name.message}</p>
@@ -188,6 +184,21 @@ export function TestimonialSubmissionForm() {
                 placeholder="Your company or organization"
               />
             </div>
+
+            {!isAuthenticated && (
+              <div className="space-y-2">
+                <Label htmlFor="author_email">Email Address</Label>
+                <Input
+                  id="author_email"
+                  type="email"
+                  {...form.register('author_email')}
+                  placeholder="your@email.com"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your email will not be displayed publicly
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="project">Related Project (Optional)</Label>

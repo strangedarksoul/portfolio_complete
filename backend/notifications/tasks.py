@@ -134,6 +134,30 @@ def send_bulk_notification(bulk_notification_id):
 
 
 @shared_task
+def create_welcome_notification(user_id):
+    """Create welcome notification for new user"""
+    try:
+        from .models import Notification
+        from django.contrib.auth import get_user_model
+        
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        
+        Notification.objects.create(
+            user=user,
+            type='welcome',
+            title='Welcome to Edzio\'s Portfolio!',
+            body='Thank you for joining. Explore projects, chat with the AI assistant, and don\'t hesitate to reach out!',
+            link='/projects'
+        )
+        
+        return f"Welcome notification created for {user.email}"
+        
+    except Exception as e:
+        return f"Error creating welcome notification for user {user_id}: {e}"
+
+
+@shared_task
 def cleanup_old_notifications():
     """Clean up old read notifications and expired notifications"""
     from django.utils import timezone

@@ -168,6 +168,13 @@ class HireRequestDetailView(generics.RetrieveAPIView):
         return HireRequest.objects.none()
 
 
+class UserHireRequestsView(generics.ListAPIView):
+    """Get hire requests for authenticated user"""
+    serializer_class = HireRequestDetailSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        return HireRequest.objects.filter(user=self.request.user).select_related('selected_gig')
 # Admin Views
 class AdminGigListView(generics.ListAPIView):
     """Admin: List all gigs"""
